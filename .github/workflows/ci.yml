@@ -36,7 +36,7 @@ jobs:
 
       - name: Run tests
         env:
-          GITHUB_TOKEN: ${{ secrets.GH_PAT }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           cd backend
           pytest -v --tb=short
@@ -59,13 +59,15 @@ jobs:
 
       - name: Build frontend image
         run: |
-          docker build ./frontend -t devpulse-frontend:test
+          docker build ./frontend \
+            --build-arg REACT_APP_API_URL=http://localhost:8000 \
+            -t devpulse-frontend:test
 
       - name: Smoke test backend container
         run: |
           docker rm -f backend-test >/dev/null 2>&1 || true
           docker run -d -p 8000:8000 \
-            -e GITHUB_TOKEN=${{ secrets.GH_PAT }} \
+            -e GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }} \
             --name backend-test devpulse-backend:test
           for attempt in {1..10}; do
             if curl --fail --silent http://localhost:8000/health; then
