@@ -27,6 +27,3 @@ Thumbs.db
 .tmp/
 npm_ci_check/
 .pytest_cache/
-BUILD_GUIDE.txt
-extract_docx_text.py
-
