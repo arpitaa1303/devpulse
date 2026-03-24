@@ -115,24 +115,43 @@ jobs:
     needs: build-and-push
 
     steps:
+      - name: Check Render deploy configuration
+        id: render-config
+        env:
+          RENDER_DEPLOY_HOOK_BACKEND: ${{ secrets.RENDER_DEPLOY_HOOK_BACKEND }}
+          RENDER_DEPLOY_HOOK_FRONTEND: ${{ secrets.RENDER_DEPLOY_HOOK_FRONTEND }}
+          RENDER_BACKEND_URL: ${{ secrets.RENDER_BACKEND_URL }}
+        run: |
+          if [ -n "$RENDER_DEPLOY_HOOK_BACKEND" ] && [ -n "$RENDER_DEPLOY_HOOK_FRONTEND" ] && [ -n "$RENDER_BACKEND_URL" ]; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+            echo "Render deploy secrets found."
+          else
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "Render deploy secrets missing. Skipping deploy steps."
+          fi
+
       - name: Trigger Render backend deploy
+        if: steps.render-config.outputs.ready == 'true'
         run: |
           echo "Triggering backend deployment..."
           curl --fail -X POST "${{ secrets.RENDER_DEPLOY_HOOK_BACKEND }}"
           echo "Backend deploy triggered"
 
       - name: Trigger Render frontend deploy
+        if: steps.render-config.outputs.ready == 'true'
         run: |
           echo "Triggering frontend deployment..."
           curl --fail -X POST "${{ secrets.RENDER_DEPLOY_HOOK_FRONTEND }}"
           echo "Frontend deploy triggered"
 
       - name: Wait for backend to deploy
+        if: steps.render-config.outputs.ready == 'true'
         run: |
           echo "Waiting 60 seconds for Render to deploy..."
           sleep 60
 
       - name: Verify backend health
+        if: steps.render-config.outputs.ready == 'true'
         run: |
           echo "Checking backend health..."
           for i in 1 2 3 4 5; do
@@ -148,6 +167,7 @@ jobs:
           exit 1
 
       - name: Print deployment summary
+        if: steps.render-config.outputs.ready == 'true'
         run: |
           echo "================================================"
           echo "DEPLOYMENT SUCCESSFUL"
@@ -155,4 +175,16 @@ jobs:
           echo "Images pushed to GHCR:"
           echo "  ${{ env.BACKEND_IMAGE }}:latest"
           echo "  ${{ env.FRONTEND_IMAGE }}:latest"
+          echo "================================================"
+
+      - name: Print skip summary
+        if: steps.render-config.outputs.ready != 'true'
+        run: |
+          echo "================================================"
+          echo "DEPLOYMENT SKIPPED"
+          echo "Missing one or more Render secrets:"
+          echo "  RENDER_DEPLOY_HOOK_BACKEND"
+          echo "  RENDER_DEPLOY_HOOK_FRONTEND"
+          echo "  RENDER_BACKEND_URL"
+          echo "Build & push completed successfully."
           echo "================================================"
