@@ -389,6 +389,12 @@ export default function App() {
             </div>
           )}
         </section>
+        <footer className="pt-10 pb-6 text-center border-t border-[var(--border-soft)] mt-10">
+          <p className="text-sm text-[var(--text-muted)] tracking-wide">
+            DevPulse · FastAPI · React.js · Docker · Redis · Prometheus ·
+            Grafana · GitHub Actions
+          </p>
+        </footer>
       </div>
     </div>
   );
