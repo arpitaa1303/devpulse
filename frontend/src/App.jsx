@@ -1,10 +1,11 @@
-import { useState } from "react";
-import { analyzeUser } from "./api/github";
+import { useEffect, useState } from "react";
+import { analyzeUser, waitForBackend } from "./api/github";
 import HealthBadge from "./components/HealthBadge";
 import LanguageChart from "./components/LanguageChart";
 import RepoCard from "./components/RepoCard";
 import SearchBar from "./components/SearchBar";
 import StatCard from "./components/StatCard";
+import WakeUpScreen from "./components/WakeUpScreen";
 
 /* ── SVG icons ────────────────────────────────────────────────── */
 const GitHubIcon = () => (
@@ -130,26 +131,80 @@ export default function App() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [isWakingUp, setIsWakingUp] = useState(false);
+  const [attemptCount, setAttemptCount] = useState(0);
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const [wakeUpError, setWakeUpError] = useState(false);
+
+  useEffect(() => {
+    sessionStorage.removeItem("backend_ready");
+  }, []);
 
   const handleSearch = async (username) => {
     setLoading(true);
     setError(null);
     setData(null);
-    const result = await analyzeUser(username);
-    if (result.error) setError(result.error);
-    else setData(result.data);
-    setLoading(false);
+
+    try {
+      const result = await analyzeUser(username);
+      if (result.error) {
+        setError(result.error);
+      } else {
+        setData(result.data);
+      }
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const scrollToAnalyzer = () => {
-    document
-      .getElementById("analyzer")
-      ?.scrollIntoView({ behavior: "smooth", block: "start" });
+  const scrollToAnalyzer = async () => {
+    setWakeUpError(false);
+
+    if (sessionStorage.getItem("backend_ready") === "true") {
+      document
+        .getElementById("analyzer")
+        ?.scrollIntoView({ behavior: "smooth", block: "start" });
+      return;
+    }
+
+    setIsWakingUp(true);
+    setAttemptCount(0);
+    setElapsedSeconds(0);
+
+    const elapsedTimer = setInterval(() => {
+      setElapsedSeconds((seconds) => seconds + 1);
+    }, 1000);
+
+    try {
+      const success = await waitForBackend((attempt) => {
+        setAttemptCount(attempt);
+      });
+
+      if (success) {
+        sessionStorage.setItem("backend_ready", "true");
+        document
+          .getElementById("analyzer")
+          ?.scrollIntoView({ behavior: "smooth", block: "start" });
+      } else {
+        sessionStorage.removeItem("backend_ready");
+        setWakeUpError(true);
+      }
+    } finally {
+      clearInterval(elapsedTimer);
+      setIsWakingUp(false);
+    }
   };
 
   return (
     /* Generous page padding — more breathing room top and bottom */
     <div className="min-h-screen px-5 py-14 text-[var(--text-primary)] md:px-10 md:py-20">
+      {isWakingUp && (
+        <WakeUpScreen
+          attemptCount={attemptCount}
+          elapsedSeconds={elapsedSeconds}
+          status="Waking the Server"
+        />
+      )}
       <div className="mx-auto max-w-5xl space-y-10">
         {/* ══════════════════════════════════════════════════════
             PAGE HEADER — DEVPULSE sits OUTSIDE any card,
@@ -198,9 +253,10 @@ export default function App() {
           <button
             type="button"
             onClick={scrollToAnalyzer}
+            disabled={isWakingUp}
             className="mt-7 inline-flex items-center gap-2 rounded-xl bg-[var(--accent-blue)] px-7 py-3.5 text-sm font-semibold text-white shadow-[0_16px_32px_-14px_rgba(37,91,140,0.48)] transition-colors hover:bg-[var(--accent-blue-strong)]"
           >
-            Analyze a Username
+            {isWakingUp ? "Waking Server..." : "Analyze a Username"}
             <svg
               viewBox="0 0 16 16"
               className="h-4 w-4"
@@ -215,6 +271,21 @@ export default function App() {
               />
             </svg>
           </button>
+          {wakeUpError && (
+            <div className="mx-auto mt-4 max-w-sm rounded-2xl border border-rose-200 bg-[var(--danger-bg)] p-4 text-sm text-[var(--danger-text)]">
+              <p className="font-semibold">
+                The server is taking longer than usual.
+              </p>
+              <p className="mt-1">Please try again in a moment.</p>
+              <button
+                type="button"
+                onClick={scrollToAnalyzer}
+                className="mt-3 rounded-lg bg-[var(--danger-text)] px-4 py-2 text-xs font-bold uppercase tracking-[0.12em] text-white transition-opacity hover:opacity-90"
+              >
+                Retry
+              </button>
+            </div>
+          )}
         </header>
 
         {/* ══════════════════════════════════════════════════════

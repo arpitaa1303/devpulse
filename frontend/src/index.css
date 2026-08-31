@@ -108,6 +108,18 @@ body {
   }
 }
 
+@keyframes wake-glow {
+  0%,
+  100% {
+    opacity: 0.65;
+    transform: scale(0.92);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.18);
+  }
+}
+
 .animate-pulse-ring {
   animation: pulse-ring 2.2s ease-out infinite;
 }
@@ -116,6 +128,9 @@ body {
 }
 .animate-breathe {
   animation: breathe 2s ease-in-out infinite;
+}
+.animate-wake-glow {
+  animation: wake-glow 2.8s ease-in-out infinite;
 }
 
 .label-mono {
